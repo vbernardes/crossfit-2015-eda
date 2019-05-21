@@ -4,6 +4,7 @@
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
 library(tidyverse)
+library(gridExtra)
 theme_set(theme_light())
 ```
 
@@ -46,7 +47,7 @@ each completed workout.
 
 Let's review the data set we are working with.
 
-```{r}
+```{r echo=FALSE}
 length(table(cf$athlete_id))
 ```
 
@@ -55,7 +56,7 @@ that competed in the 2015 Open.
 
 Let's what data we have about each athlete.
 
-```{r}
+```{r echo=FALSE}
 str(cf)
 ```
 
@@ -68,6 +69,60 @@ and deadlift).
 We will primarily be interested to see what factors are related to the athletes’
 results, contained in the variables *score* and *rank*.
 
+## Summary of Features
+
+Let's briefly examine the features we will be using in our analysis in order to
+identify their distribution, any outliers, and also improve our knowledge of the
+data we will be working with.
+
+```{r fig.width=9, echo=FALSE, message=FALSE, warning=FALSE, Feature_Summary}
+# First, let's create a data frame with just one row per athlete, instead
+# of one row per result, so we can plot their demographic data.
+unique_athletes <- subset(cf, !duplicated(athlete_id))
+
+division_bar <- qplot(x = division, data = unique_athletes)
+category_bar <- qplot(x = category, data = unique_athletes)
+age_hist <- qplot(x = age, data = unique_athletes)
+height_hist <- qplot(x = height, data = unique_athletes)
+weight_hist <- qplot(x = weight, data = unique_athletes)
+snatch_hist <- qplot(x = snatch, data = unique_athletes)
+deadlift_hist <- qplot(x = deadlift, data = unique_athletes)
+pullups_hist <- qplot(x = pullups, data = unique_athletes)
+
+grid.arrange(division_bar, category_bar, age_hist,
+             height_hist, weight_hist, snatch_hist,
+             deadlift_hist, pullups_hist, ncol = 3)
+```
+
+We can see there are some pretty extreme values for height, weight, snatch,
+deadlift, and pullups that are getting in the way of our understanding the data.
+Let's identify those outliers and remove them in order to make our analysis more
+robust.
+
+```{r fig.width=9, echo=FALSE, message=FALSE, warning=FALSE, Feature_Summary_No_Outliers}
+is_outlier <- function(var) {
+  var %in% boxplot.stats(var)$out
+}
+
+height_hist <- qplot(x = height,
+                     data = subset(unique_athletes, !is_outlier(height)))
+weight_hist <- qplot(x = weight,
+                     data = subset(unique_athletes, !is_outlier(weight)))
+snatch_hist <- qplot(x = snatch,
+                     data = subset(unique_athletes, !is_outlier(snatch)))
+deadlift_hist <- qplot(x = deadlift,
+                     data = subset(unique_athletes, !is_outlier(deadlift)))
+pullups_hist <- qplot(x = pullups,
+                     data = subset(unique_athletes, !is_outlier(pullups)))
+
+grid.arrange(division_bar, category_bar, age_hist,
+             height_hist, weight_hist, snatch_hist,
+             deadlift_hist, pullups_hist, ncol = 3)
+```
+
+Now this looks much better and provides us with a first look at the data we
+will be working with and its distribution.
+
 ## Getting to know our athletes
 
 Let's get to know a little about the athletes we will be exploring further in
@@ -75,11 +130,7 @@ this analysis.
 
 ### Age
 
-```{r Athlete_Ages}
-# First, let's create a data frame with just one row per athlete, instead
-# of one row per result, so we can plot their demographic data.
-unique_athletes <- subset(cf, !duplicated(athlete_id))
-
+```{r echo=FALSE, Athlete_Ages}
 ggplot(data = subset(unique_athletes, !is.na(gender)),
        aes(x = age)) +
   geom_histogram(binwidth = 1, aes(fill = gender)) +
@@ -100,14 +151,14 @@ number of athletes, and has scaled-down versions of the Rx workouts.
 
 Let’s see how the athletes are divided into both categories.
 
-```{r Athlete_Categories}
+```{r echo=FALSE, Athlete_Categories}
 ggplot(data = subset(unique_athletes, !is.na(gender)),
        aes(x = category, fill = division)) +
-  geom_bar() +
+  geom_bar(position = 'dodge') +
   scale_fill_brewer(palette = 'Greens')
 ```
 
-```{r}
+```{r echo=FALSE}
 prop.table(table(unique_athletes$category))
 ```
 
@@ -116,15 +167,14 @@ in the Rx category. The plot also shows the proportion between male and female
 athletes on both categories. While men are in higher number in the Rx category,
 the Scaled category includes more women than men.
 
-Let's combine the data from the previous two plots into a single plot where we
-will also be able to see the distribution of age per category.
+Now let's create a single plot where we will be able to see the distribution of
+age per category.
 
-```{r Athlete_Age_by_Categories}
+```{r echo=FALSE, Athlete_Age_by_Categories}
 ggplot(data = subset(unique_athletes, !is.na(gender)),
-       aes(x = age)) +
-  geom_histogram(binwidth = 1, aes(fill = category)) +
-  scale_fill_brewer() +
-  facet_wrap(~gender)
+       aes(x = gender, y = age)) +
+  geom_boxplot(aes(fill = category)) +
+  scale_fill_brewer()
 ```
 
 It is interesting to note the center of the distribution of scaled athletes
@@ -135,7 +185,7 @@ difficult to complete Rx workouts.
 Let’s plot the histogram and some summary statistics for the scaled category to
 check that observation.
 
-```{r Scaled_Age_Histogram}
+```{r echo=FALSE, Scaled_Age_Histogram}
 scaled_athletes <- subset(unique_athletes, category == 'Scaled')
 
 ggplot(data = subset(scaled_athletes, !is.na(gender)),
@@ -152,7 +202,7 @@ ggplot(data = subset(scaled_athletes, !is.na(gender)),
   facet_wrap(~gender)
 ```
 
-```{r Scaled_Age_Stats}
+```{r echo=FALSE, Scaled_Age_Stats}
 summary(subset(unique_athletes, gender == 'Female' & category == 'Rx')$age)
 summary(subset(unique_athletes, gender == 'Male' & category == 'Rx')$age)
 
@@ -169,7 +219,7 @@ genders.
 Let's find out how long the athletes have had CrossFit experience prior to
 joining the Open.
 
-```{r How_Long_Athletes}
+```{r echo=FALSE, How_Long_Athletes}
 ggplot(subset(unique_athletes, !is.na(howlong)),
        aes(x = howlong)) +
   geom_bar(fill = 'lightblue')
@@ -183,10 +233,11 @@ One aspect that might influence the choice of Scaled vs. Rx category is how
 long the athlete has been practicing CrossFit for. It seems reasonable that
 more experienced athletes might be more inclined to opt for the Rx category.
 
-```{r Category_by_How_Long}
+```{r echo=FALSE, Category_by_How_Long}
 ggplot(subset(unique_athletes, !is.na(howlong)),
        aes(x = howlong)) +
-  geom_bar(aes(fill = category))
+  geom_bar(aes(fill = category),
+           position = 'dodge')
 ```
 
 We can see the proportion of Rx athletes is larger for athletes with over 2
@@ -200,7 +251,7 @@ many of our athletes, we can’t draw many conclusions from it.
 
 Finally, let's take a look at where our athletes come from.
 
-```{r Athlete_Regions}
+```{r echo=FALSE, Athlete_Regions}
 ggplot(data = subset(unique_athletes, region != ""),
        aes(x = region)) +
   geom_bar(fill = 'lightblue') +
@@ -236,7 +287,7 @@ workout score is measured in seconds.
 Now let's plot the distribuition of scores by workout and division. Unless
 otherwise mentioned, we will focus on the Rx category for the analysis.
 
-```{r Scores_by_Workout_and_Division}
+```{r echo=FALSE, Scores_by_Workout_and_Division}
 ggplot(subset(cf, !is.na(cf$score) & category == 'Rx'),
        aes(x = score)) +
   geom_histogram(binwidth = 5, aes(fill = division)) +
@@ -259,7 +310,7 @@ Workout 15.1 consisted of:
 *10 deadlifts (115 / 75 lb.)*
 *5 snatches (115 / 75 lb.)*
 
-```{r message=FALSE, warning=FALSE, '15_1_Scores'}
+```{r echo=FALSE, message=FALSE, warning=FALSE, '15_1_Scores'}
 open.15.1.rx <- subset(cf, category == 'Rx' & stage == 1)
 
 ggplot(open.15.1.rx, 
@@ -281,7 +332,7 @@ our data set contains benchmarks for those exercises for some athletes, let's
 check if their maximum weight lifted had any relationship to their results in
 this workout.
 
-```{r message=FALSE, warning=FALSE, '15_1_Scores_by_Deadlift'}
+```{r echo=FALSE, message=FALSE, warning=FALSE, '15_1_Scores_by_Deadlift'}
 ggplot(open.15.1.rx,
        aes(x = deadlift, y = score)) +
   geom_jitter(alpha = 1/100, aes(color = division)) +
@@ -290,10 +341,10 @@ ggplot(open.15.1.rx,
   geom_smooth(data = subset(open.15.1.rx, division == 'Female'),
               color = 'red', linetype = 2) +
   scale_color_brewer(palette = 'Set1') +
-  scale_x_continuous(limits = c(quantile(unique_athletes$deadlift, .01, na.rm=T),
-                                quantile(unique_athletes$deadlift, .99, na.rm=T))) +
-  scale_y_continuous(limits = c(quantile(open.15.1.rx$score, .01, na.rm=T),
-                                quantile(open.15.1.rx$score, .99, na.rm=T)))
+  scale_x_continuous(limits=c(quantile(unique_athletes$deadlift, .01,na.rm=T),
+                              quantile(unique_athletes$deadlift, .99,na.rm=T)))+
+  scale_y_continuous(limits=c(quantile(open.15.1.rx$score, .01, na.rm=T),
+                              quantile(open.15.1.rx$score, .99, na.rm=T)))
 ```
 
 Even though the data is very dispersed, we can see a positive trend between the
@@ -302,7 +353,7 @@ female athletes.
 
 Now let's run the same analysis for the snatch.
 
-```{r message=FALSE, warning=FALSE, '15_1_Scores_by_Snatch'}
+```{r echo=FALSE, message=FALSE, warning=FALSE, '15_1_Scores_by_Snatch'}
 ggplot(data = open.15.1.rx,
        aes(x = snatch, y = score)) +
   geom_jitter(alpha = 1/100, aes(color = division)) +
@@ -311,10 +362,10 @@ ggplot(data = open.15.1.rx,
   geom_smooth(data = subset(open.15.1.rx, division == 'Female'),
               color = 'red', linetype = 2) +
   scale_color_brewer(palette = 'Set1') +
-  scale_x_continuous(limits = c(quantile(unique_athletes$snatch, .01, na.rm = T),
-                                quantile(unique_athletes$snatch, .99, na.rm = T))) +
-  scale_y_continuous(limits = c(quantile(open.15.1.rx$score, .05, na.rm = T),
-                                quantile(open.15.1.rx$score, .99, na.rm = T)))
+  scale_x_continuous(limits=c(quantile(unique_athletes$snatch, .01,na.rm = T),
+                              quantile(unique_athletes$snatch, .99,na.rm = T)))+
+  scale_y_continuous(limits =c(quantile(open.15.1.rx$score, .05, na.rm = T),
+                               quantile(open.15.1.rx$score, .99, na.rm = T)))
 ```
 
 The same can be said for the snatch. Though the data is also very dispersed, we
@@ -333,7 +384,7 @@ jerk he or she could manage. This is a workout where strength is critical.
 
 Let's see the distribution of scores for this workout.
 
-```{r message=FALSE, warning=FALSE, '15_1a_Scores'}
+```{r echo=FALSE, message=FALSE, warning=FALSE, '15_1a_Scores'}
 open.15.1a.rx <- subset(cf, category == 'Rx' & stage == 1.1)
 
 ggplot(open.15.1a.rx,
@@ -345,21 +396,23 @@ ggplot(open.15.1a.rx,
 The distribution of scores looks very similar for both divisions.
 
 Since strength is vital for this workout, I wonder if bodyweight has any
-relation to the score. Let's make a plot of the average result by weight and
-find out.
+relation to the score. Let's make a plot of result by weight and find out.
 
-```{r message=FALSE, warning=FALSE, '15_1a_Scores_by_Weight'}
+```{r echo=FALSE, message=FALSE, warning=FALSE, '15_1a_Scores_by_Weight'}
 ggplot(data = open.15.1a.rx,
        aes(x = 5*round(weight/5), y = score)) +
+  geom_jitter(aes(color = division),
+              alpha = 1/170) +
   geom_line(stat = 'summary',
             fun.y = mean,
-            aes(color = division)) +
-  scale_color_brewer(palette = 'Set1') +
-  scale_x_continuous(limits = c(quantile(unique_athletes$weight, .01, na.rm = T),
-                                quantile(unique_athletes$weight, .99, na.rm = T)))
+            aes(color = division),
+            size = 1) +
+  scale_x_continuous(limits=c(quantile(unique_athletes$weight, .01,na.rm = T),
+                              quantile(unique_athletes$weight, .99,na.rm = T)))+
+  scale_y_continuous(limits = c(50, 350))
 ```
 
-```{r}
+```{r echo=FALSE}
 cor.test(open.15.1a.rx$weight, open.15.1a.rx$score)
 ```
 
@@ -380,7 +433,7 @@ Workout 15.2 consisted of:
 *12 chest-to-bar pull-ups*
 *Etc., following same pattern until you fail to complete both rounds*
 
-```{r message=FALSE, warning=FALSE, '15_2_Scores'}
+```{r echo=FALSE, message=FALSE, warning=FALSE, '15_2_Scores'}
 open.15.2.rx <- subset(cf, category == 'Rx' & stage == 2)
 
 ggplot(open.15.2.rx,
@@ -392,14 +445,14 @@ ggplot(open.15.2.rx,
 Let's zoom in on the female plot and try to figure out why there is a sharp
 peak at around score 10.
 
-```{r message=FALSE, warning=FALSE, '15_2_Female_Scores_Zoom'}
+```{r echo=FALSE, message=FALSE, warning=FALSE, '15_2_Female_Scores_Zoom'}
 ggplot(subset(open.15.2.rx, division == 'Female'), 
        aes(x = score)) +
   geom_histogram(binwidth = 1, fill = 'lightcoral') +
   scale_x_continuous(limits = c(0, 100), breaks = seq(0, 100, 5))
 ```
 
-```{r}
+```{r echo=FALSE}
 female.15.2.scores <- table(subset(open.15.2.rx, division == 'Female')$score)
 female.15.2.scores[names(female.15.2.scores) == 10]
 
@@ -418,14 +471,18 @@ Our data set also contains data about the maximum number of pull-ups each
 athlete has performed in a row. Let's plot the average 15.2 score by maximum
 pull-ups.
 
-```{r message=FALSE, warning=FALSE, '15_2_Mean_Scores_by_Pullup'}
+```{r echo=FALSE, message=FALSE, warning=FALSE, '15_2_Mean_Scores_by_Pullup'}
 ggplot(data = open.15.2.rx,
        aes(x = pullups, y = score)) +
+  geom_jitter(aes(color = division),
+              alpha = 1/30) +
   geom_line(stat = 'summary',
             fun.y = mean,
-            aes(color = division)) +
-  scale_x_continuous(limits = c(quantile(unique_athletes$pullups, .02, na.rm = T),
-                                quantile(unique_athletes$pullups, .98, na.rm = T)))
+            aes(color = division),
+            size = 1) +
+  scale_x_continuous(limits=c(quantile(unique_athletes$pullups,.02,na.rm = T),
+                              quantile(unique_athletes$pullups,.98,na.rm = T)))+
+  scale_y_continuous(limits = c(0, 300))
 ```
 
 This plot clearly shows a positive relationship between the average maximum
@@ -442,7 +499,7 @@ Workout 15.3 consisted of:
 *50 wall-ball shots*
 *100 double-unders*
 
-```{r message=FALSE, warning=FALSE, '15_3_Scores'}
+```{r echo=FALSE, message=FALSE, warning=FALSE, '15_3_Scores'}
 open.15.3.rx <- subset(cf, category == 'Rx' & stage == 3)
 
 ggplot(open.15.3.rx,
@@ -455,11 +512,11 @@ This is the plot we saw earlier that shows very sharp peaks. Let's dig deeper
 and take a look at this workout to try to figure out what the peaks are about.
 We will plot the women's division and look more closely at what happened.
 
-```{r message=FALSE, warning=FALSE, '15_3_Female_Scores'}
+```{r echo=FALSE, message=FALSE, warning=FALSE, '15_3_Female_Scores'}
 ggplot(subset(open.15.3.rx, division == 'Female'),
        aes(x = score)) +
   geom_histogram(binwidth = 3, fill = 'lightcoral') +
-  scale_x_continuous(limits = c(0, 700), breaks = seq(0, 700, 25))
+  scale_x_continuous(limits = c(0, 700), breaks = seq(0, 700, 50))
 ```
 
 This workout consisted of 3 different movements, the first of which was 7 reps
@@ -497,17 +554,20 @@ Since this workout involves handstand pushups, which are pushups where the
 athlete is upside down, pushing up his or her own weight, let’s investigate if
 lighter athletes had an edge.
 
-```{r message=FALSE, warning=FALSE, '15_4_Mean_Scores_by_Weight'}
+```{r echo=FALSE, message=FALSE, warning=FALSE, '15_4_Mean_Scores_by_Weight'}
 open.15.4.rx <- subset(cf, category == 'Rx' & stage == 4)
 
 ggplot(data = open.15.4.rx,
        aes(x = 5*round(weight/5), y = score)) +
+  geom_jitter(aes(color = division),
+              alpha = 1/100) +
   geom_line(stat = 'summary',
             fun.y = mean,
-            aes(color = division)) +
-  scale_color_brewer(palette = 'Set1') +
-  scale_x_continuous(limits = c(quantile(unique_athletes$weight, .01, na.rm = T),
-                                quantile(unique_athletes$weight, .99, na.rm = T)))
+            aes(color = division),
+            size = 1) +
+  scale_x_continuous(limits=c(quantile(unique_athletes$weight, .01,na.rm = T),
+                              quantile(unique_athletes$weight, .99,na.rm = T)))+
+  scale_y_continuous(limits = c(0, 150))
 ```
 
 That doesn’t look to be the case. We can identify, especially on the male
@@ -518,14 +578,17 @@ yield better results.
 
 How about height? I wonder how it relates to scores for this workout.
 
-```{r message=FALSE, warning=FALSE, '15_4_Mean_Scores_by_Height'}
+```{r echo=FALSE, message=FALSE, warning=FALSE, '15_4_Mean_Scores_by_Height'}
 ggplot(open.15.4.rx,
        aes(x = height, y = score)) +
+  geom_jitter(aes(color = division),
+              alpha = 1/100) +
   geom_line(stat = 'summary',
             fun.y = mean,
-            aes(color = division)) +
-  scale_color_brewer(palette = 'Set1') +
-  scale_x_continuous(limits = c(62, 82))
+            aes(color = division),
+            size = 1) +
+  scale_x_continuous(limits = c(62, 77)) +
+  scale_y_continuous(limits = c(0, 150))
 ```
 
 This plot shows us something interesting and somewhat unexpected. We can
@@ -534,7 +597,7 @@ this workout.
 
 Now let's combine the two measurements and display both on one chart.
 
-```{r message=FALSE, warning=FALSE, '15_4_Male_Scores_by_Weight_and_Height'}
+```{r echo=FALSE, message=FALSE, warning=FALSE, '15_4_M_Scores_Weight_Height'}
 ggplot(subset(open.15.4.rx,
               height > 62 & height <= 75 & division == 'Male'),
        aes(x = 5*round(weight/5), y = score)) +
@@ -546,7 +609,7 @@ ggplot(subset(open.15.4.rx,
   theme_dark()
 ```
 
-```{r message=FALSE, warning=FALSE, '15_4_Female_Scores_by_Weight_and_Height'}
+```{r echo=FALSE, message=FALSE, warning=FALSE, '15_4_F_Scores_Weight_Height'}
 ggplot(subset(open.15.4.rx,
               height >= 60 & height <= 70 & division == 'Female'),
        aes(x = 5*round(weight/5), y = score)) +
@@ -577,12 +640,12 @@ This looks like a pretty intensive workout. It involved completing the sequence
 of movements as fast as possible, so the lower the score, the better the result
 for the athlete. I wonder how age affected athletes’ performance.
 
-```{r message=FALSE, warning=FALSE, '15_5_Score_by_Age'}
+```{r echo=FALSE, message=FALSE, warning=FALSE, '15_5_Score_by_Age'}
 open.15.5 <- subset(cf, stage == 5 & category == 'Rx')
 
 ggplot(open.15.5,
        aes(x = age, y = score)) +
-  geom_jitter(alpha = 1/40, aes(color = division)) +
+  geom_jitter(alpha = 1/60, aes(color = division)) +
   geom_smooth() +
   scale_color_brewer(palette = 'Set1') +
   scale_x_continuous(limits = c(18, 55),
@@ -598,14 +661,18 @@ workout.
 
 Let's average the results by age to help us check this trend.
 
-```{r message=FALSE, warning=FALSE, '15_5_Mean_Score_by_Age'}
+```{r echo=FALSE, message=FALSE, warning=FALSE, '15_5_Mean_Score_by_Age'}
 ggplot(open.15.5,
        aes(x = age, y = score)) +
   scale_x_continuous(limits = c(18, 55),
                      breaks = seq(15, 60, 5)) +
+  geom_jitter(aes(color = division),
+              alpha = 1/100) +
   geom_line(stat = 'summary',
-              fun.y = mean,
-              aes(color = division))
+            fun.y = mean,
+            aes(color = division),
+            size = 1) +
+  scale_y_continuous(limits = c(350, 1400))
 ```
 
 The trend looks very clear now. For 15.5, average performance decreased with
@@ -615,15 +682,34 @@ To continue with this reasoning, let's check if age is reflected on other
 workouts as well. Let's plot the average result by age for the rest of the
 workouts.
 
-```{r message=FALSE, warning=FALSE, Mean_Scores_by_Age}
-ggplot(subset(cf, category == 'Rx'),
-       aes(x = age, y = score)) +
+```{r fig.width=7, fig.height=10, echo=FALSE, message=FALSE, warning=FALSE, Mean_Scores_by_Age}
+# Plot score by age for given stage
+plot_score_by_age <- function(st, alp = 1/150) {
+  plot <- ggplot(subset(cf,
+                        category == 'Rx' &
+                          stage == st),
+                 aes(x = age, y = score)) +
   scale_x_continuous(limits = c(18, 55),
                      breaks = seq(15, 60, 5)) +
+  geom_jitter(aes(color = division),
+              alpha = alp) +
   geom_line(stat = 'summary',
-              fun.y = mean,
-              aes(color = division)) +
-  facet_wrap(~stage, scales = 'free')
+            fun.y = mean,
+            aes(color = division),
+            size = 1)
+  
+  return(plot)
+}
+
+p1 <- plot_score_by_age(1) + scale_y_continuous(limits = c(25, 230))
+p1a <- plot_score_by_age(1.1, alp = 1/170) +
+  scale_y_continuous(limits = c(50, 350))
+p2 <- plot_score_by_age(2) + scale_y_continuous(limits = c(0, 300))
+p3 <- plot_score_by_age(3, alp = 1/80) + scale_y_continuous(limits = c(0, 500))
+p4 <- plot_score_by_age(4) + scale_y_continuous(limits = c(0, 150))
+p5 <- plot_score_by_age(5) + scale_y_continuous(limits = c(350, 1400))
+
+grid.arrange(p1, p1a, p2, p3, p4, p5, ncol = 2)
 ```
 
 Indeed, for most workouts, performance seems to peak at the age range of 20 to
@@ -634,7 +720,7 @@ trend as clearly, and shows relatively high mean scores for ages above 50.
 Finally, let’s create a variable that represents each athlete’s overall rank and
 plot that against age.
 
-```{r message=FALSE, warning=FALSE, Create_Overall_Rank}
+```{r echo=FALSE, message=FALSE, warning=FALSE, Create_Overall_Rank}
 # The overall rank is calculated by summing the rank for each workout
 overallrank_male <- cf[cf$category == 'Rx' & cf$division == 'Male', ] %>%
   group_by(athlete_id) %>%
@@ -652,9 +738,11 @@ overallrank_female$overall_rank <- as.integer(overallrank_female$overall_rank)
 
 # Join rank on main table
 cf_rank <- cf %>%
-  left_join(overallrank_male[, c('athlete_id', 'overall_rank')], by='athlete_id')
+  left_join(overallrank_male[, c('athlete_id', 'overall_rank')],
+            by='athlete_id')
 cf_rank <- cf_rank %>%
-  left_join(overallrank_female[, c('athlete_id', 'overall_rank')], by='athlete_id')
+  left_join(overallrank_female[, c('athlete_id', 'overall_rank')],
+            by='athlete_id')
 cf_rank$overall_rank.x <- ifelse(!is.na(cf_rank$overall_rank.y),
                                  cf_rank$overall_rank.y,
                                  cf_rank$overall_rank.x)
@@ -665,14 +753,16 @@ names(cf_rank)[names(cf_rank) == 'overall_rank.x'] <- 'overall_rank'
 cf <- cf_rank
 ``` 
 
-```{r message=FALSE, warning=FALSE, Overall_Rank_by_Age}
+```{r echo=FALSE, message=FALSE, warning=FALSE, Overall_Rank_by_Age}
 ggplot(subset(cf, category == 'Rx'),
        aes(x = age, y = overall_rank)) +
+  scale_color_brewer(palette = 'Set1') +
   scale_x_continuous(limits = c(18, 55),
                      breaks = seq(10, 60, 5)) +
+  geom_jitter(aes(color = division), alpha = 1/200) +
   geom_line(stat = 'summary',
-            fun.y = mean,
-            aes(color = division))
+            fun.y = mean) +
+  facet_wrap(~division, scales = 'free')
 ```
 
 We can see here the same trend we saw on the last chart. The average overall
@@ -739,31 +829,45 @@ slightly lighter, indicating a slightly better performance by shorter athletes
 for this workout.
 
 ### Plot Three
-```{r echo=FALSE, warning=FALSE, message=FALSE, Plot_Three}
-# Mean_Scores_by_Age
+```{r fig.width=7, fig.height=10, echo=FALSE, warning=FALSE, message=FALSE, Plot_Three}
+p1 <- plot_score_by_age(1) +
+  scale_y_continuous(limits = c(25, 230)) +
+  ggtitle('15.1')
+p1a <- plot_score_by_age(1.1, alp = 1/170) +
+  scale_y_continuous(limits = c(50, 350)) +
+  ggtitle('15.1a')
+p2 <- plot_score_by_age(2) +
+  scale_y_continuous(limits = c(0, 300)) +
+  ggtitle('15.2')
+p3 <- plot_score_by_age(3, alp = 1/80) +
+  scale_y_continuous(limits = c(0, 500)) +
+  ggtitle('15.3')
+p4 <- plot_score_by_age(4) +
+  scale_y_continuous(limits = c(0, 150)) +
+  ggtitle('15.4')
+p5 <- plot_score_by_age(5, alp = 1/100) +
+  scale_y_continuous(limits = c(350, 1400)) +
+  ggtitle('15.5')
 
-stage_labels <- c('1' = '15.1',
-                  '1.1' = '15.1a',
-                  '2' = '15.2',
-                  '3' = '15.3',
-                  '4' = '15.4',
-                  '5' = '15.5')
+set_labels <- function(plt) {
+  plt <- plt + labs(x = 'Age (Years)',
+                    y = 'Score (Number of Reps or Seconds)',
+                    color = 'Division')
+  return(plt)
+}
 
-ggplot(subset(cf, category == 'Rx'),
-       aes(x = age, y = score)) +
-  scale_x_continuous(limits = c(18, 55),
-                     breaks = seq(15, 60, 5)) +
-  geom_line(stat = 'summary',
-              fun.y = mean,
-              aes(color = division)) +
-  facet_wrap(~stage,
-             labeller = as_labeller(stage_labels),
-             scales = 'free') +
-  labs(x = 'Age (Years)',
-       y = 'Mean Score (Number of Repetitions or Seconds)',
-       color = 'Division',
-       title = 'Mean Scores by Age for Each Workout')
+p1 <- set_labels(p1)
+p1a <- set_labels(p1a)
+p2 <- set_labels(p2)
+p3 <- set_labels(p3)
+p4 <- set_labels(p4)
+p5 <- set_labels(p5)
+
+grid.arrange(p1, p1a, p2, p3, p4, p5,
+             ncol = 2,
+             top = 'Mean Scores by Age for Each Workout')
 ```
+
 
 This is a somewhat depressing chart, but the trend it shows is very clear:
 average CrossFit athletes’ performance decreases with age. Except for some high
