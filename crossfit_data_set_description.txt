@@ -1,0 +1,29 @@
+# CrossFit 2015 Leaderboard Data
+
+## Description
+
+A data set containing information about the 2015 CrossFit Leaderboard. It includes data about athletes and their results for that year.
+
+It was obtained at [https://data.world/bgadoci/crossfit-data](https://data.world/bgadoci/crossfit-data). The data was scraped from the [online CrossFit Leaderboard](https://games.crossfit.com/leaderboard).
+
+## Format
+
+A data frame with 1504303 rows and 28 variables:
+
+* **division**: Athlete division (Female or Male).
+* **stage**: Workout number (1 through 5).
+* **athlete_id**: Numeric ID.
+* **rank**: Athlete rank by stage.
+* **score**: Score by stage, in number of repetitions or seconds.
+* **howlong**: How long the athlete has had CrossFit experience for.
+* **category**: Athlete category (Rx or Scaled).
+* **scaled**: Boolean indicating if athlete is scaled or not.
+* **name**: Athlete name.
+* **region**: Which region the athlete comes from.
+* **team**: Team the athlete is part of.
+* **affiliate**: Affiliate the athlete is part of.
+* **gender**: Athlete gender.
+* **age**: Athlete age.
+* **height**: Athlete height in inches.
+* **weight**: Athlete weight in pounds.
+* **Remaning variables (from *fran* to *pullups*)**: These are the results of several benchmark workouts.

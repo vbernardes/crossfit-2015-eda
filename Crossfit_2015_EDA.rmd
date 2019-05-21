@@ -1,0 +1,793 @@
+# CrossFit 2015 Leaderboard
+
+### by Vitor Bernardes
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+library(tidyverse)
+theme_set(theme_light())
+```
+
+```{r echo=FALSE, Load_the_Data}
+# Load the Data
+cf <- read.csv('crossfit2015.csv')
+
+# order 'howlong' variable
+levels(cf$howlong) <- ordered(c('Less than 6 months|',
+                                '6-12 months|',
+                                '1-2 years|',
+                                '2-4 years|',
+                                '4+ years|'))
+```
+
+## Introduction to CrossFit and the Data Set
+
+CrossFit is a popular fitness program and fitness sport created in 2000. It
+combines elements of aerobic exercise, calisthenics (body weight exercises),
+and Olympic weightlifting with the goal of improving overall fitness.
+
+On the sport side, since 2007 CrossFit promotes an annual competition open for
+athletes from all over the world, called the CrossFit Games. The Games has
+three stages of qualification: the Open, Regionals, and the Games themselves.
+
+The Open, which receives its name because participation is open to anyone, is
+held over five weeks at the beginning of the competition season. Each week
+contains a workout that must be completed by athletes. The athletes can complete
+the workout at their local box (how CrossFit gyms are called) and submit their
+scores online. The workouts are referenced by their year and the number
+corresponding to the order they have been presented in. For example, the first
+workout of the 2015 Open is called 15.1, the second one is called 15.2, and
+so forth.
+
+The data set we are going to analyze is the 2015 Open leaderboard. It contains
+data from athletes from all over the world and the results they submitted for
+each completed workout.
+
+## Summary of the Data Set
+
+Let's review the data set we are working with.
+
+```{r}
+length(table(cf$athlete_id))
+```
+
+As we can see, it contains observations about roughly over 250,000 athletes
+that competed in the 2015 Open.
+
+Let's what data we have about each athlete.
+
+```{r}
+str(cf)
+```
+
+We can see we have several variables with data on the athletes themselves (such
+as name, region, age, height, and weight), some variables related to the Open
+workouts and results (such as stage, category, score, and rank), and also some
+results for benchmark workouts by each athlete (such as fran, helen, snatch,
+and deadlift).
+
+We will primarily be interested to see what factors are related to the athletes’
+results, contained in the variables *score* and *rank*.
+
+## Getting to know our athletes
+
+Let's get to know a little about the athletes we will be exploring further in
+this analysis.
+
+### Age
+
+```{r Athlete_Ages}
+# First, let's create a data frame with just one row per athlete, instead
+# of one row per result, so we can plot their demographic data.
+unique_athletes <- subset(cf, !duplicated(athlete_id))
+
+ggplot(data = subset(unique_athletes, !is.na(gender)),
+       aes(x = age)) +
+  geom_histogram(binwidth = 1, aes(fill = gender)) +
+  scale_fill_brewer() +
+  facet_wrap(~gender)
+```
+
+We see the distribution of the number of athletes by age is pretty similar for
+both men and women. We can also see the number of male athletes is larger in
+the 2015 Open.
+
+### Category
+
+The competition is divided into two categories: Rx and Scaled. In the Rx
+category, athletes must complete the workouts exactly as prescribed. The Scaled
+category was created so the Open would be more accessible to a larger
+number of athletes, and has scaled-down versions of the Rx workouts.
+
+Let’s see how the athletes are divided into both categories.
+
+```{r Athlete_Categories}
+ggplot(data = subset(unique_athletes, !is.na(gender)),
+       aes(x = category, fill = division)) +
+  geom_bar() +
+  scale_fill_brewer(palette = 'Greens')
+```
+
+```{r}
+prop.table(table(unique_athletes$category))
+```
+
+This plot shows us the absolute majority of athletes (85%) in the 2015 Open are
+in the Rx category. The plot also shows the proportion between male and female
+athletes on both categories. While men are in higher number in the Rx category,
+the Scaled category includes more women than men.
+
+Let's combine the data from the previous two plots into a single plot where we
+will also be able to see the distribution of age per category.
+
+```{r Athlete_Age_by_Categories}
+ggplot(data = subset(unique_athletes, !is.na(gender)),
+       aes(x = age)) +
+  geom_histogram(binwidth = 1, aes(fill = category)) +
+  scale_fill_brewer() +
+  facet_wrap(~gender)
+```
+
+It is interesting to note the center of the distribution of scaled athletes
+appears slightly higher than for Rx athletes. That is specially noticeable
+for men. It seems reasonable, because older athletes might find it more
+difficult to complete Rx workouts.
+
+Let’s plot the histogram and some summary statistics for the scaled category to
+check that observation.
+
+```{r Scaled_Age_Histogram}
+scaled_athletes <- subset(unique_athletes, category == 'Scaled')
+
+ggplot(data = subset(scaled_athletes, !is.na(gender)),
+       aes(x = age)) +
+  geom_histogram(binwidth = 1, fill = 'lightskyblue3') +
+  geom_vline(data = subset(scaled_athletes, gender == 'Female'),
+             aes(xintercept = mean(subset(scaled_athletes,
+                                          gender == 'Female')$age)),
+             linetype = 2) +
+  geom_vline(data = subset(scaled_athletes, gender == 'Male'),
+             aes(xintercept = mean(subset(scaled_athletes,
+                                          gender == 'Male')$age)),
+             linetype = 2) +
+  facet_wrap(~gender)
+```
+
+```{r Scaled_Age_Stats}
+summary(subset(unique_athletes, gender == 'Female' & category == 'Rx')$age)
+summary(subset(unique_athletes, gender == 'Male' & category == 'Rx')$age)
+
+summary(subset(unique_athletes, gender == 'Female' & category == 'Scaled')$age)
+summary(subset(unique_athletes, gender == 'Male' & category == 'Scaled')$age)
+```
+
+Indeed, we can see that while the average age for men and women in the Rx
+category is very close, the Scaled category has higher average ages for both
+genders.
+
+### CrossFit experience
+
+Let's find out how long the athletes have had CrossFit experience prior to
+joining the Open.
+
+```{r How_Long_Athletes}
+ggplot(subset(unique_athletes, !is.na(howlong)),
+       aes(x = howlong)) +
+  geom_bar(fill = 'lightblue')
+```
+
+While we do not have data on many athletes, we can see many of them have
+joined the 2015 Open with less than a year of CrossFit experience, which might
+show eagerness to participate in the event.
+
+One aspect that might influence the choice of Scaled vs. Rx category is how
+long the athlete has been practicing CrossFit for. It seems reasonable that
+more experienced athletes might be more inclined to opt for the Rx category.
+
+```{r Category_by_How_Long}
+ggplot(subset(unique_athletes, !is.na(howlong)),
+       aes(x = howlong)) +
+  geom_bar(aes(fill = category))
+```
+
+We can see the proportion of Rx athletes is larger for athletes with over 2
+years of experience, and smaller for athletes with between 6 months and 2 years
+of experience. One interesting observation is that most athletes with less than
+6 months of CrossFit experience chose the Rx category. It certainly is a curious
+fact to notice, however since we unfortunately don’t have experience data for
+many of our athletes, we can’t draw many conclusions from it.
+
+### Regions
+
+Finally, let's take a look at where our athletes come from.
+
+```{r Athlete_Regions}
+ggplot(data = subset(unique_athletes, region != ""),
+       aes(x = region)) +
+  geom_bar(fill = 'lightblue') +
+  coord_flip()
+```
+
+This plot shows that, despite being open to participation to athletes from all
+over the world, the popularity of the competition is still heavily centered in
+North America, followed by Europe. Huge continents such as Africa and Asia still
+show very little participation in the Open.
+
+## Taking a look at the workouts
+
+Now let's take a look at some results.
+
+As we mentioned, the workouts are referenced by their year and number, such as
+15.1, 15.2 etc. We will refer to them using this pattern.
+
+*NOTE: The 2015 Open had a special workout on the first week, which we will*
+*refer to as 15.1a. In our data set, it is refered to as 1.1.*
+
+Also, it is important to mention the workouts can be one of two kinds. In the
+first kind, the athlete tries to achieve the highest possible number of
+repetitions, or reps, in the given timeframe. In the second kind, the athlete
+must complete the workout as fast as possible. The scores for the first kind of
+workout are measured in number of reps (which means the higher, the better),
+and for the second kind are measured in seconds (which means the lower, the
+better).
+
+All but the last workout of the 2015 Open are of the first kind. Only the 15.5
+workout score is measured in seconds.
+
+Now let's plot the distribuition of scores by workout and division. Unless
+otherwise mentioned, we will focus on the Rx category for the analysis.
+
+```{r Scores_by_Workout_and_Division}
+ggplot(subset(cf, !is.na(cf$score) & category == 'Rx'),
+       aes(x = score)) +
+  geom_histogram(binwidth = 5, aes(fill = division)) +
+  facet_wrap(c('stage', 'division'), scales = 'free')
+```
+
+Several plots show peaks. The peaks are present on 15.1, 15.2, and 15.4, but
+they are particularly sharp and intriguing on workout 15.3. I should investigate
+further to find out what happended there.
+
+That is a very interesting chart, but warrants a closer look at each workout
+so we can better understand the story they are telling.
+
+### Workout 15.1
+
+Workout 15.1 consisted of:
+
+*Complete as many rounds and reps as possible in 9 minutes of:*
+*15 toes-to-bars*
+*10 deadlifts (115 / 75 lb.)*
+*5 snatches (115 / 75 lb.)*
+
+```{r message=FALSE, warning=FALSE, '15_1_Scores'}
+open.15.1.rx <- subset(cf, category == 'Rx' & stage == 1)
+
+ggplot(open.15.1.rx, 
+       aes(x = score)) +
+  geom_histogram(binwidth = 5, aes(fill = division)) +
+  facet_wrap(~division, scales = 'free') +
+  scale_x_continuous(breaks = seq(0, 300, 30))
+```
+
+Each 30 reps represents a completed round of exercises. This particular workout
+is interesting as the first movement is a relatively easier gymnastic one,
+compared to the other 2 weightlifting exercises. So the peaks in this plot show
+how many people struggled to perform the weightlifting exercises in each round.
+The dips at 15, 45, 75, and so on, show that athletes rarely ended their
+workouts on the gymnastic movement, but rather on the heavier exercises.
+
+Since the last 2 exercises for each round are the deadlift and the snatch, and
+our data set contains benchmarks for those exercises for some athletes, let's
+check if their maximum weight lifted had any relationship to their results in
+this workout.
+
+```{r message=FALSE, warning=FALSE, '15_1_Scores_by_Deadlift'}
+ggplot(open.15.1.rx,
+       aes(x = deadlift, y = score)) +
+  geom_jitter(alpha = 1/100, aes(color = division)) +
+  geom_smooth(data = subset(open.15.1.rx, division == 'Male'),
+              color = 'blue', linetype = 2) +
+  geom_smooth(data = subset(open.15.1.rx, division == 'Female'),
+              color = 'red', linetype = 2) +
+  scale_color_brewer(palette = 'Set1') +
+  scale_x_continuous(limits = c(quantile(unique_athletes$deadlift, .01, na.rm=T),
+                                quantile(unique_athletes$deadlift, .99, na.rm=T))) +
+  scale_y_continuous(limits = c(quantile(open.15.1.rx$score, .01, na.rm=T),
+                                quantile(open.15.1.rx$score, .99, na.rm=T)))
+```
+
+Even though the data is very dispersed, we can see a positive trend between the
+athlete’s record deadlift and their score on this workout, both for male and
+female athletes.
+
+Now let's run the same analysis for the snatch.
+
+```{r message=FALSE, warning=FALSE, '15_1_Scores_by_Snatch'}
+ggplot(data = open.15.1.rx,
+       aes(x = snatch, y = score)) +
+  geom_jitter(alpha = 1/100, aes(color = division)) +
+  geom_smooth(data = subset(open.15.1.rx, division == 'Male'),
+              color = 'blue', linetype = 2) +
+  geom_smooth(data = subset(open.15.1.rx, division == 'Female'),
+              color = 'red', linetype = 2) +
+  scale_color_brewer(palette = 'Set1') +
+  scale_x_continuous(limits = c(quantile(unique_athletes$snatch, .01, na.rm = T),
+                                quantile(unique_athletes$snatch, .99, na.rm = T))) +
+  scale_y_continuous(limits = c(quantile(open.15.1.rx$score, .05, na.rm = T),
+                                quantile(open.15.1.rx$score, .99, na.rm = T)))
+```
+
+The same can be said for the snatch. Though the data is also very dispersed, we
+can see a positive trend between the athlete’s record snatch and their score on
+this workout.
+
+### Workout 15.1a
+
+Workout 15.1a consisted of:
+
+*1-rep-max clean and jerk*
+*6-minute time cap*
+
+In other words, the athlete had 6 minutes to perform the heaviest clean and
+jerk he or she could manage. This is a workout where strength is critical.
+
+Let's see the distribution of scores for this workout.
+
+```{r message=FALSE, warning=FALSE, '15_1a_Scores'}
+open.15.1a.rx <- subset(cf, category == 'Rx' & stage == 1.1)
+
+ggplot(open.15.1a.rx,
+       aes(x = score)) +
+  geom_histogram(binwidth = 10, aes(fill = division)) +
+  facet_wrap(~division, scales = 'free')
+```
+
+The distribution of scores looks very similar for both divisions.
+
+Since strength is vital for this workout, I wonder if bodyweight has any
+relation to the score. Let's make a plot of the average result by weight and
+find out.
+
+```{r message=FALSE, warning=FALSE, '15_1a_Scores_by_Weight'}
+ggplot(data = open.15.1a.rx,
+       aes(x = 5*round(weight/5), y = score)) +
+  geom_line(stat = 'summary',
+            fun.y = mean,
+            aes(color = division)) +
+  scale_color_brewer(palette = 'Set1') +
+  scale_x_continuous(limits = c(quantile(unique_athletes$weight, .01, na.rm = T),
+                                quantile(unique_athletes$weight, .99, na.rm = T)))
+```
+
+```{r}
+cor.test(open.15.1a.rx$weight, open.15.1a.rx$score)
+```
+
+Indeed we see a positive relationship between bodyweight and score for 15.1a.
+
+### Workout 15.2
+
+Workout 15.2 consisted of:
+
+*Every 3 minutes for as long as possible complete:*
+*From 0:00-3:00*
+*2 rounds of:*
+*10 overhead squats (95 / 65 lb.)*
+*10 chest-to-bar pull-ups*
+*From 3:00-6:00*
+*2 rounds of:*
+*12 overhead squats (95 / 65 lb.)*
+*12 chest-to-bar pull-ups*
+*Etc., following same pattern until you fail to complete both rounds*
+
+```{r message=FALSE, warning=FALSE, '15_2_Scores'}
+open.15.2.rx <- subset(cf, category == 'Rx' & stage == 2)
+
+ggplot(open.15.2.rx,
+       aes(x = score)) +
+  geom_histogram(binwidth = 5, aes(fill = division)) +
+  facet_wrap(~division, scales = 'free')
+```
+
+Let's zoom in on the female plot and try to figure out why there is a sharp
+peak at around score 10.
+
+```{r message=FALSE, warning=FALSE, '15_2_Female_Scores_Zoom'}
+ggplot(subset(open.15.2.rx, division == 'Female'), 
+       aes(x = score)) +
+  geom_histogram(binwidth = 1, fill = 'lightcoral') +
+  scale_x_continuous(limits = c(0, 100), breaks = seq(0, 100, 5))
+```
+
+```{r}
+female.15.2.scores <- table(subset(open.15.2.rx, division == 'Female')$score)
+female.15.2.scores[names(female.15.2.scores) == 10]
+
+prop.female.15.2.scores <- prop.table(female.15.2.scores)
+prop.female.15.2.scores[names(prop.female.15.2.scores) == 10]
+```
+
+Now we can see very clearly what happened: almost 9,500 women, or 17.3% of the
+total number of athletes that completed this workout, were not able to complete
+1 chest-to-bar pull-up after the first set of 10 overhead squats. The ones that
+were able to perform that movement were able to pass the first round and
+completed the workout at several score levels. That shows how difficult that
+movement is to perform.
+
+Our data set also contains data about the maximum number of pull-ups each
+athlete has performed in a row. Let's plot the average 15.2 score by maximum
+pull-ups.
+
+```{r message=FALSE, warning=FALSE, '15_2_Mean_Scores_by_Pullup'}
+ggplot(data = open.15.2.rx,
+       aes(x = pullups, y = score)) +
+  geom_line(stat = 'summary',
+            fun.y = mean,
+            aes(color = division)) +
+  scale_x_continuous(limits = c(quantile(unique_athletes$pullups, .02, na.rm = T),
+                                quantile(unique_athletes$pullups, .98, na.rm = T)))
+```
+
+This plot clearly shows a positive relationship between the average maximum
+number of pull-ups and 15.2 scores. In addition, since the female score
+by average maximum pull-ups is higher than male scores, it reinforces how
+particularly challenging the chest-to-bar pull-up was for female athletes.
+
+### Workout 15.3
+
+Workout 15.3 consisted of:
+
+*Complete as many rounds and reps as possible in 14 minutes of:*
+*7 muscle-ups*
+*50 wall-ball shots*
+*100 double-unders*
+
+```{r message=FALSE, warning=FALSE, '15_3_Scores'}
+open.15.3.rx <- subset(cf, category == 'Rx' & stage == 3)
+
+ggplot(open.15.3.rx,
+       aes(x = score)) +
+  geom_histogram(binwidth = 10, aes(fill = division)) +
+  facet_wrap(~division, scales = 'free')
+```
+
+This is the plot we saw earlier that shows very sharp peaks. Let's dig deeper
+and take a look at this workout to try to figure out what the peaks are about.
+We will plot the women's division and look more closely at what happened.
+
+```{r message=FALSE, warning=FALSE, '15_3_Female_Scores'}
+ggplot(subset(open.15.3.rx, division == 'Female'),
+       aes(x = score)) +
+  geom_histogram(binwidth = 3, fill = 'lightcoral') +
+  scale_x_continuous(limits = c(0, 700), breaks = seq(0, 700, 25))
+```
+
+This workout consisted of 3 different movements, the first of which was 7 reps
+of a highly demanding movement (muscle-up), followed by 50 reps and 100 reps of
+two much simpler movements. So this plot depicts a very clear story: athletes
+struggling to perform the first movement, then speeding somewhat more easily
+through the next two, and then struggling (again) if they are able to reach the
+next round of muscle-ups. Each peak corresponds to athletes whose workouts ended
+trying to execute that movement.
+
+After the start of rounds two and three (second and third peaks), we can see a
+smaller concentration of scores, which represent athletes whose workouts ended
+executing the second movement in the round, the wall balls.
+
+### Workout 15.4
+
+Workout 15.4 consisted of:
+
+*Complete as many reps as possible in 8 minutes of:*
+*3 handstand push-ups*
+*3 cleans*
+*6 handstand push-ups*
+*3 cleans*
+*9 handstand push-ups*
+*3 cleans*
+*12 handstand push-ups*
+*6 cleans*
+*15 handstand push-ups*
+*Etc., adding 3 reps to the handstand push-up each round, and 3 reps to the*
+*clean every 3 rounds.*
+*Men clean 185 lb.*
+*Women clean 125 lb.*
+
+Since this workout involves handstand pushups, which are pushups where the
+athlete is upside down, pushing up his or her own weight, let’s investigate if
+lighter athletes had an edge.
+
+```{r message=FALSE, warning=FALSE, '15_4_Mean_Scores_by_Weight'}
+open.15.4.rx <- subset(cf, category == 'Rx' & stage == 4)
+
+ggplot(data = open.15.4.rx,
+       aes(x = 5*round(weight/5), y = score)) +
+  geom_line(stat = 'summary',
+            fun.y = mean,
+            aes(color = division)) +
+  scale_color_brewer(palette = 'Set1') +
+  scale_x_continuous(limits = c(quantile(unique_athletes$weight, .01, na.rm = T),
+                                quantile(unique_athletes$weight, .99, na.rm = T)))
+```
+
+That doesn’t look to be the case. We can identify, especially on the male
+division, a curve where lighter and heavier athletes performed more poorly. We
+should take this information and remember this workout also included a
+weightlifting movement, so it makes sense that an optimal range of weights would
+yield better results.
+
+How about height? I wonder how it relates to scores for this workout.
+
+```{r message=FALSE, warning=FALSE, '15_4_Mean_Scores_by_Height'}
+ggplot(open.15.4.rx,
+       aes(x = height, y = score)) +
+  geom_line(stat = 'summary',
+            fun.y = mean,
+            aes(color = division)) +
+  scale_color_brewer(palette = 'Set1') +
+  scale_x_continuous(limits = c(62, 82))
+```
+
+This plot shows us something interesting and somewhat unexpected. We can
+definitely see a trend where shorter athletes had better results on average for
+this workout.
+
+Now let's combine the two measurements and display both on one chart.
+
+```{r message=FALSE, warning=FALSE, '15_4_Male_Scores_by_Weight_and_Height'}
+ggplot(subset(open.15.4.rx,
+              height > 62 & height <= 75 & division == 'Male'),
+       aes(x = 5*round(weight/5), y = score)) +
+  geom_jitter(alpha = 1/5, aes(color = height)) +
+  geom_smooth() +
+  scale_color_gradient(low = 'white', high = 'red') +
+  scale_x_continuous(limits = c(125, 275)) +
+  scale_y_continuous(limits = c(0, 150)) +
+  theme_dark()
+```
+
+```{r message=FALSE, warning=FALSE, '15_4_Female_Scores_by_Weight_and_Height'}
+ggplot(subset(open.15.4.rx,
+              height >= 60 & height <= 70 & division == 'Female'),
+       aes(x = 5*round(weight/5), y = score)) +
+  geom_jitter(alpha = 1/5, aes(color = height)) +
+  geom_smooth() +
+  scale_color_gradient(low = 'white', high = 'red') +
+  scale_x_continuous(limits = c(100, 180)) +
+  scale_y_continuous(limits = c(0, 170)) +
+  theme_dark()
+```
+
+On both the above charts we can see that lighter athletes tend to be shorter,
+and the heavier athletes are usually taller. We can also see how the top of the
+charts are lighter (indicating shorter athletes), especially on the lighter
+bodyweight range.
+
+### Workout 15.5
+
+Workout 15.5 consisted of:
+
+*27-21-15-9 reps for time of:*
+*Row (calories)*
+*Thrusters*
+*Men use 95 lb.*
+*Women use 65 lb.*
+
+This looks like a pretty intensive workout. It involved completing the sequence
+of movements as fast as possible, so the lower the score, the better the result
+for the athlete. I wonder how age affected athletes’ performance.
+
+```{r message=FALSE, warning=FALSE, '15_5_Score_by_Age'}
+open.15.5 <- subset(cf, stage == 5 & category == 'Rx')
+
+ggplot(open.15.5,
+       aes(x = age, y = score)) +
+  geom_jitter(alpha = 1/40, aes(color = division)) +
+  geom_smooth() +
+  scale_color_brewer(palette = 'Set1') +
+  scale_x_continuous(limits = c(18, 55),
+                     breaks = seq(10, 60, 5)) +
+  scale_y_continuous(limits = c(300, 1500)) +
+  facet_wrap(~division, scales = 'free')
+```
+
+Even though the points are very disperse, it looks like the older the athlete,
+the longer he or she will take to complete this workout. Also, male athletes
+appear to have achieved better scores on average than female athletes for this
+workout.
+
+Let's average the results by age to help us check this trend.
+
+```{r message=FALSE, warning=FALSE, '15_5_Mean_Score_by_Age'}
+ggplot(open.15.5,
+       aes(x = age, y = score)) +
+  scale_x_continuous(limits = c(18, 55),
+                     breaks = seq(15, 60, 5)) +
+  geom_line(stat = 'summary',
+              fun.y = mean,
+              aes(color = division))
+```
+
+The trend looks very clear now. For 15.5, average performance decreased with
+age.
+
+To continue with this reasoning, let's check if age is reflected on other
+workouts as well. Let's plot the average result by age for the rest of the
+workouts.
+
+```{r message=FALSE, warning=FALSE, Mean_Scores_by_Age}
+ggplot(subset(cf, category == 'Rx'),
+       aes(x = age, y = score)) +
+  scale_x_continuous(limits = c(18, 55),
+                     breaks = seq(15, 60, 5)) +
+  geom_line(stat = 'summary',
+              fun.y = mean,
+              aes(color = division)) +
+  facet_wrap(~stage, scales = 'free')
+```
+
+Indeed, for most workouts, performance seems to peak at the age range of 20 to
+30, then it starts to decrease from that age on. One interesting thing this
+chart shows is the female performance on 15.3, which doesn't display that
+trend as clearly, and shows relatively high mean scores for ages above 50.
+
+Finally, let’s create a variable that represents each athlete’s overall rank and
+plot that against age.
+
+```{r message=FALSE, warning=FALSE, Create_Overall_Rank}
+# The overall rank is calculated by summing the rank for each workout
+overallrank_male <- cf[cf$category == 'Rx' & cf$division == 'Male', ] %>%
+  group_by(athlete_id) %>%
+  summarise(name = first(name),
+            point_total = sum(rank))
+overallrank_male$overall_rank <- rank(overallrank_male$point_total)
+overallrank_male$overall_rank <- as.integer(overallrank_male$overall_rank)
+
+overallrank_female <- cf[cf$category == 'Rx' & cf$division == 'Female', ] %>%
+  group_by(athlete_id) %>%
+  summarise(name = first(name),
+            point_total = sum(rank))
+overallrank_female$overall_rank <- rank(overallrank_female$point_total)
+overallrank_female$overall_rank <- as.integer(overallrank_female$overall_rank)
+
+# Join rank on main table
+cf_rank <- cf %>%
+  left_join(overallrank_male[, c('athlete_id', 'overall_rank')], by='athlete_id')
+cf_rank <- cf_rank %>%
+  left_join(overallrank_female[, c('athlete_id', 'overall_rank')], by='athlete_id')
+cf_rank$overall_rank.x <- ifelse(!is.na(cf_rank$overall_rank.y),
+                                 cf_rank$overall_rank.y,
+                                 cf_rank$overall_rank.x)
+
+# Keep just one column
+cf_rank$overall_rank.y <- NULL
+names(cf_rank)[names(cf_rank) == 'overall_rank.x'] <- 'overall_rank'
+cf <- cf_rank
+``` 
+
+```{r message=FALSE, warning=FALSE, Overall_Rank_by_Age}
+ggplot(subset(cf, category == 'Rx'),
+       aes(x = age, y = overall_rank)) +
+  scale_x_continuous(limits = c(18, 55),
+                     breaks = seq(10, 60, 5)) +
+  geom_line(stat = 'summary',
+            fun.y = mean,
+            aes(color = division))
+```
+
+We can see here the same trend we saw on the last chart. The average overall
+rank by age seems to peak at 20 to 30, then it starts to decrease from that age
+on.
+
+## Final Plots and Summary
+
+### Plot One
+```{r echo=FALSE, warning=FALSE, Plot_One}
+#15.2_Female_Scores_Zoom
+ggplot(subset(open.15.2.rx, division == 'Female'), 
+       aes(x = score)) +
+  geom_histogram(binwidth = 1, fill = 'lightcoral') +
+  scale_x_continuous(limits = c(0, 100), breaks = seq(0, 100, 5)) +
+  scale_y_continuous(breaks = seq(0, 10000, 1000)) +
+  labs(x = 'Score (Number of Repetitions)',
+       y = 'Number of Athletes',
+       title = 'Female 15.2 Scores - The Chest-to-Bar Obstacle')
+```
+
+This is a very simple — though impressive — chart, because it tells a story so
+clearly.
+
+The first round of this workout involved executing a set of 10 overhead squats,
+followed by a set of 10 chest-to-bar pull-ups. This chart shows us the large
+number of athletes who were able to complete the first 10 overhead squats, but
+were unable to perform a single chest-to-bar pull-up. The number of athletes who
+scored 10 repetitions on this workout was almost 9,500, or 17.3% of the total
+number of competitors.
+
+In other words, only by mastering that movement, athletes would have been
+immediately ahead of 9,500 competitors.
+
+### Plot Two
+```{r echo=FALSE, warning=FALSE, message=FALSE, Plot_Two}
+#15.4_Female_Scores_by_Weight_and_Height
+ggplot(subset(open.15.4.rx,
+              height >= 60 & height <= 70 & division == 'Female'),
+       aes(x = 5*round(weight/5), y = score)) +
+  geom_jitter(alpha = 1/5, aes(color = height)) +
+  geom_smooth() +
+  scale_color_gradient(low = 'white', high = 'red') +
+  scale_x_continuous(limits = c(100, 180), breaks = seq(100, 180, 10)) +
+  scale_y_continuous(limits = c(0, 170)) +
+  theme_dark() +
+  labs(x = 'Weight (pounds)',
+       y = 'Score (Number of Repetitions)',
+       color = 'Height (inches)',
+       title = 'Female 15.4 Scores - Weight and Height')
+```
+
+This plot shows depicts the relationship between weight and scores for the
+female division of Open 15.4, and also displays how heights are related to those
+features.
+
+Even though the scores are widely distributed across weights, averaging out
+their values helps to identify a curve where the best average scores were
+obtained by athletes weighing around 130 to 140 lbs.
+
+Also, we can see that athletes’ weight tend to increase as height increases. In
+addition, we can see that, as score increases, the horizontal “levels” get
+slightly lighter, indicating a slightly better performance by shorter athletes
+for this workout.
+
+### Plot Three
+```{r echo=FALSE, warning=FALSE, message=FALSE, Plot_Three}
+# Mean_Scores_by_Age
+
+stage_labels <- c('1' = '15.1',
+                  '1.1' = '15.1a',
+                  '2' = '15.2',
+                  '3' = '15.3',
+                  '4' = '15.4',
+                  '5' = '15.5')
+
+ggplot(subset(cf, category == 'Rx'),
+       aes(x = age, y = score)) +
+  scale_x_continuous(limits = c(18, 55),
+                     breaks = seq(15, 60, 5)) +
+  geom_line(stat = 'summary',
+              fun.y = mean,
+              aes(color = division)) +
+  facet_wrap(~stage,
+             labeller = as_labeller(stage_labels),
+             scales = 'free') +
+  labs(x = 'Age (Years)',
+       y = 'Mean Score (Number of Repetitions or Seconds)',
+       color = 'Division',
+       title = 'Mean Scores by Age for Each Workout')
+```
+
+This is a somewhat depressing chart, but the trend it shows is very clear:
+average CrossFit athletes’ performance decreases with age. Except for some high
+scores for older female athletes on 15.3, we can clearly see that performance
+peaks when the athlete is around 20 to 30 years old, then decreases from that
+age on.
+
+## Reflection
+
+Exploring this data set enabled me to get a good sense of what relates to an
+athlete’s performance at the Open. And, more often than not, it showed me what
+is not related.
+
+During the exploration, I hit several dead-ends, where expected relationships
+between variables were very faint or appeared to be non-existent. It was only
+after persisting and investigating multiple possibilities that some
+relationships came to life.
+
+The relationships that did appear were fascinating in two ways: they either
+showed clear trends that marked an athlete’s performance, or they told precise
+stories about what happened on a given week during the Open.
+
+Regarding future work, I would love to incorporate the results from other years
+and investigate how athletes’ profile and demographics changed over the years,
+as well as the distribution of results. That would enable me to check if
+athletes are getting better, and if the CrossFit Open is getting more
+competitive each year.

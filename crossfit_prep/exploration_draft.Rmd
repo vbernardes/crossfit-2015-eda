@@ -1,0 +1,307 @@
+---
+title: "CrossFit 2015 Leaderboard"
+author: "Vitor Sexto Bernardes"
+date: "19/01/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+theme_set(theme_light())
+```
+
+## CrossFit 2015 Leaderboard
+
+# Intro to data set
+
+First we are going to explain what the data set is about.
+
+# Show data set
+
+Let's see a bit about the structure of the data we're working with.
+
+```{r}
+str(cf)
+```
+
+# First look at the data
+
+## Getting to know our athletes
+
+Let's see a little about the athletes contained in our data set.
+
+Let's see their ages:
+
+```{r athlete_ages}
+# First, let's create a data frame with just one row per athlete, instead
+# of one row per result, so we can plot their demographic data.
+unique_athletes <- subset(cf, !duplicated(athlete_id))
+
+ggplot(data = subset(unique_athletes, !is.na(gender)),
+       aes(x = age)) +
+  geom_histogram(binwidth = 1, aes(fill = gender)) +
+  scale_fill_brewer() +
+  facet_wrap(~gender)
+```
+
+Now let's see what categories they are in.
+
+```{r athlete_categories}
+ggplot(data = subset(unique_athletes, !is.na(gender)),
+       aes(x = category, fill = division)) +
+  geom_bar() +
+  scale_fill_brewer(palette = 'Greens')
+```
+
+That's a big difference. Let's see the proportions in each division:
+
+```{r}
+prop.table(table(unique_athletes[unique_athletes$division == 'Female',]$category))
+prop.table(table(unique_athletes[unique_athletes$division == 'Male',]$category))
+```
+
+TODO: Explain in percentages.
+
+Also, let's plot them together!
+
+```{r}
+ggplot(data = subset(unique_athletes, !is.na(gender)),
+       aes(x = age)) +
+  geom_histogram(binwidth = 1, aes(fill = category)) +
+  scale_fill_brewer() +
+  facet_wrap(~gender)
+```
+
+
+Let's also see the regions they come from.
+
+```{r athlete_regions}
+ggplot(data = subset(unique_athletes, region != ""),
+       aes(x = region)) +
+  geom_bar(aes(fill = category)) +
+  scale_fill_brewer(palette = 'Greens') +
+  coord_flip()
+```
+
+Now let's divide the regions by gender as well, and see what we get.
+
+```{r}
+ggplot(data = subset(unique_athletes, !is.na(gender) & region != ''),
+       aes(x = region)) +
+  geom_bar(aes(fill = gender)) +
+  scale_fill_brewer() +
+  coord_flip()
+```
+
+## Taking a look at the workouts
+
+Now let's take a look at some results.
+
+Let's plot the distribuition of scores per workout and division. Unless
+otherwise mentioned, we will focus on the Rx category.
+
+```{r}
+ggplot(subset(cf, !is.na(cf$score) & category == 'Rx'),
+       aes(x = score)) +
+  geom_histogram(binwidth = 5, aes(fill = division)) +
+  facet_wrap(c('stage', 'division'), scales = 'free')
+```
+
+Things of note about the above chart:
+
+- Most plots would benefit from a closer look, since many are long-tailed, due
+to a few athletes with extreme scores standing out.
+- I wonder what is up with those peaks at 15.3. I should take a closer look too.
+
+### Workout 15.3
+
+Let's dig deeper and take a look at this workout to try to figure out what
+the peaks are about. We will plot the women's division for that.
+
+```{r}
+open.15.3 <- subset(cf, category == 'Rx' & stage == 3)
+
+ggplot(subset(open.15.3, !is.na(cf$score) & division == 'Female'),
+       aes(x = score)) +
+  geom_histogram(binwidth = 5) +
+  scale_x_continuous(limits = c(0, 700), breaks = seq(0, 700, 25))
+```
+
+Interesting. The workout consisted of 3 different exercises, the first of which
+was 7 reps of a difficult movement (ring muscle-up), followed by 50 reps and
+100 reps of two much simpler movements. So what we are seeing with this plot are
+athletes struggling to perform the first movement, then speeding through the
+next two, and then struggling (again) if they are able to reach the next round
+of the first movement. Each peak corresponds to athletes whose workouts ended
+trying to execute that movement.
+
+Looking back at the other charts, we find that the peaks present on workouts
+15.1 and 15.2 are also explained by the same thing. They consisted of several
+movements, some of which were faster to execute than others.
+
+## Relating results to factors
+
+Now let's try to find some factors that might be correlated with the results
+we see for different workouts.
+
+### Workout 15.1a
+
+Let's start by examining workout 15.1a. It consists of a basic 1 rep-max of a
+clean & jerk movement. In other words, who is able to lift the largest weight
+gets a better score. It seems reasonable to assume heavier athletes will have
+a better chance at this workout than others. Let's check if that holds up.
+
+```{r}
+#open.15.1a <- subset(cf, stage == 1.1 & category == 'Rx')
+
+ggplot(data = open.15.1a.rx,
+       aes(x = 5*round(weight/5), y = score)) +
+  geom_jitter(alpha = 1/100,
+              color = 'lightblue3') +
+  scale_color_continuous() +
+  facet_wrap(~division, scales = 'free') +
+  scale_x_continuous(limits = c(quantile(unique_athletes$weight, .005, na.rm = T),
+                                quantile(unique_athletes$weight, .998, na.rm = T))) +
+  geom_line(stat = 'summary',
+            fun.y = mean,
+            color = 'blue',
+            linetype = 2)
+```
+
+Although the dispersion of weight lifted appears somewhat large, we can
+definitively see an upward trend in average weight lifted from athletes with
+around 100 to 200 lbs.
+
+Let's take a closer look at just the averages then.
+
+```{r}
+ggplot(open.15.1a,
+       aes(x = 5*round(weight/5), y = score)) +
+  scale_x_continuous(limits = c(90, 300)) +
+  geom_line(stat = 'summary',
+            fun.y = mean,
+            aes(color = division))
+```
+
+It looks like our assumption was correct: lighter athletes had a harder time on
+this workout.
+
+### Age
+
+I wonder if age plays a significant role in the results.
+
+First, let's take a look at the average overall rank by age.
+
+```{r}
+ggplot(subset(cf, category == 'Rx'),
+       aes(x = age, y = overall_rank)) +
+  scale_x_continuous(limits = c(18, 55),
+                     breaks = seq(10, 60, 5)) +
+  geom_line(stat = 'summary',
+            fun.y = mean,
+            aes(color = division))
+```
+
+That doesn't look like the relationship has any significance at all. Let's move
+on and focus on the influence of age on a particularly intensive workout, 15.5.
+
+### Age and 15.5
+
+This workout involved completing the sequence of movements as fast as possible,
+so the lower the score, the better the result for the athlete.
+
+```{r}
+open.15.5 <- subset(cf, stage == 5 & category == 'Rx')
+
+ggplot(open.15.5,
+       aes(x = age, y = score)) +
+  geom_jitter(alpha = 1/40,
+              aes(color = division)) +
+  scale_color_brewer(palette = 'Set1') +
+  scale_x_continuous(limits = c(18, 55),
+                     breaks = seq(10, 60, 5)) +
+  scale_y_continuous(limits = c(250, 1500))
+```
+
+The points are again very disperse. It looks like the older the athlete, the
+longer he or she will take to complete this workout. Also, male athletes appear
+to have achieved lower scores on average than female athletes for this workout.
+
+Let's average the results by age to help us check this possible trend.
+
+```{r}
+ggplot(open.15.5,
+       aes(x = age, y = score)) +
+  scale_x_continuous(limits = c(18, 55),
+                     breaks = seq(15, 60, 5)) +
+  geom_line(stat = 'summary',
+              fun.y = mean,
+              aes(color = division))
+```
+
+### Age and other scores
+
+To continue with this reasoning, let's check if age is reflected on other
+workouts as well. Let's plot the average result by age for the rest of the
+workouts.
+
+```{r}
+ggplot(subset(cf, category == 'Rx'),
+       aes(x = age, y = score)) +
+  scale_x_continuous(limits = c(18, 55),
+                     breaks = seq(15, 60, 5)) +
+  geom_line(stat = 'summary',
+              fun.y = mean,
+              aes(color = division)) +
+  facet_wrap(~stage, scales = 'free')
+```
+
+Indeed, for most workouts, performance seems to peak at the age range of 20 to
+30, then it starts to decrease from that age on.
+
+One interesting thing this chart shows us is the female performance on 15.3,
+which doesn't display that trend as clearly. Let's focus on that workout again
+for a moment.
+
+```{r}
+# Top 10 results per age
+top10.15.3.byage <- subset(open.15.3, division == 'Female') %>%
+  group_by(age) %>%
+  top_n(10, score)
+
+ggplot(NULL,
+       aes(x = age, y = score)) +
+  scale_x_continuous(limits = c(18, 55),
+                     breaks = seq(15, 60, 5)) +
+  geom_line(data = subset(open.15.3, division == 'Female'),
+            stat = 'summary',
+            fun.y = mean,
+            linetype = 2) +
+  geom_point(data = top10.15.3.byage,
+             aes(x = age, y = score)) +
+  geom_line(data = top10.15.3.byage,
+            aes(x = 3*round(age/3), y = score),
+            stat = 'summary',
+            fun.y = mean,
+            linetype = 2) +
+  scale_color_brewer()
+```
+
+### Height and scores
+
+Similarly to age, let's check if height influences any workout result on
+average.
+
+```{r}
+ggplot(subset(cf, category == 'Rx'),
+       aes(x = height, y = score)) +
+  scale_x_continuous(limits = c(60, 80)) +
+  geom_line(stat = 'summary',
+            fun.y = mean,
+            aes(color = division)) +
+  facet_wrap(~stage, scales = 'free')
+```
+
+It appears that, differently from age, height has no direct relationship to
+workout scores.
